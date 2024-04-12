@@ -1,0 +1,82 @@
+id: template_standard_flow
+name: Template Standard Flow
+inputs:
+  question:
+    type: string
+    is_chat_input: false
+  search_type:
+    type: string
+    is_chat_input: false
+  n_results:
+    type: int
+    is_chat_input: false
+outputs:
+  answer:
+    type: string
+    reference: ${AnswerQuestion.output}
+nodes:
+- name: GetSearchTerms
+  type: llm
+  source:
+    type: code
+    path: GetSearchTerms.jinja2
+  inputs:
+    deployment_name: gpt-35-turbo
+    temperature: 0
+    top_p: 1
+    max_tokens: 50
+    response_format:
+      type: text
+    presence_penalty: 0
+    frequency_penalty: 0
+    question: ${inputs.question}
+  provider: AzureOpenAI
+  connection: nwkaoai
+  api: chat
+  module: promptflow.tools.aoai
+  use_variants: false
+- name: GetSearchResults
+  type: python
+  source:
+    type: code
+    path: GetSearchResults.py
+  inputs:
+    embeddings: ${GenerateEmbeddings.output}
+    n_results: ${inputs.n_results}
+    query_text: ${GetSearchTerms.output}
+    search_type: ${inputs.search_type}
+  use_variants: false
+- name: GenerateEmbeddings
+  type: python
+  source:
+    type: package
+    tool: promptflow.tools.embedding.embedding
+  inputs:
+    connection: nwkaoai
+    deployment_name: text-embedding-ada-002
+    input: ${inputs.question}
+  use_variants: false
+- name: AnswerQuestion
+  type: llm
+  source:
+    type: code
+    path: AnswerQuestion.jinja2
+  inputs:
+    deployment_name: gpt-4-32k
+    temperature: 0
+    top_p: 1
+    max_tokens: 800
+    response_format:
+      type: text
+    presence_penalty: 0
+    frequency_penalty: 0
+    manuals: ${GetSearchResults.output}
+    question: ${inputs.question}
+  provider: AzureOpenAI
+  connection: nwkaoai
+  api: chat
+  module: promptflow.tools.aoai
+  use_variants: false
+node_variants: {}
+environment:
+  python_requirements_txt: requirements.txt
